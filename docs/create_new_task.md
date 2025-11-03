@@ -333,3 +333,37 @@ uv run play Mjlab-Cartpole --checkpoint_file <checkpoint_path>
 ```
 
 ![Trained CartPole](static/cartpole_trained.gif)
+
+---
+
+## 5. External Package Registration (Optional)
+
+To develop your task in a separate repository outside of mjlab, add an entry
+point to your package's `pyproject.toml`:
+
+> [!NOTE]
+> The `[build-system]` section is required for the plugin system to work.
+
+```toml
+[build-system]
+requires = ["uv_build>=0.8.19,<0.9.0"]
+build-backend = "uv_build"
+
+[project.entry-points."mjlab.tasks"]
+your_package_name = "your_package_name"
+```
+
+The entry point references a Python module that will be imported when mjlab runs.
+This module should contain your `gym.register()` calls (commonly placed in
+`your_package_name/__init__.py`, but can be any module).
+
+mjlab will auto-import your package when running `train` or `play`, making your
+registered tasks available:
+
+```bash
+# Works from any external package!
+uv run train Mjlab-YourTask
+```
+
+See [g1_spinkick_example](https://github.com/mujocolab/g1_spinkick_example) for
+a complete working example.

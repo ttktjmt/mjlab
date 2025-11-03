@@ -117,6 +117,18 @@ available.
 
 ---
 
+## Development
+
+### Can I develop custom tasks in my own repository?
+
+Yes! mjlab has a plugin system that lets you develop tasks in separate
+repositories while seamlessly integrating with mjlab's `train` and `play`
+commands. See
+[Creating a New Task → External Package Registration](create_new_task.md#5-external-package-registration-optional)
+for a complete guide with a working example.
+
+---
+
 ## Assets & Compatibility
 
 ### What robots are included?
