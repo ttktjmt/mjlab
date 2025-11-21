@@ -81,28 +81,35 @@ def create_position_actuator(
   effort_limit: float | None = None,
   armature: float = 0.0,
   frictionloss: float = 0.0,
-  inheritrange: float = 1.0,
 ) -> mujoco.MjsActuator:
-  """Creates a <position> actuator."""
+  """Creates a <position> actuator.
+
+  An important note about this actuator is that we set `ctrllimited` to False. This is
+  because we want to allow the policy to output setpoints that are outside the kinematic
+  limits of the joint.
+  """
   actuator = spec.add_actuator(name=joint_name, target=joint_name)
 
+  # Use <position> settings.
   actuator.trntype = mujoco.mjtTrn.mjTRN_JOINT
   actuator.dyntype = mujoco.mjtDyn.mjDYN_NONE
   actuator.gaintype = mujoco.mjtGain.mjGAIN_FIXED
   actuator.biastype = mujoco.mjtBias.mjBIAS_AFFINE
 
-  actuator.inheritrange = inheritrange
-  actuator.ctrllimited = True  # Technically redundant but being explicit.
+  # Set stiffness and damping.
   actuator.gainprm[0] = stiffness
   actuator.biasprm[1] = -stiffness
   actuator.biasprm[2] = -damping
 
+  # Limits.
+  actuator.ctrllimited = False
+  # No ctrlrange needed.
   if effort_limit is not None:
-    # Will this throw an error with autolimits=True?
     actuator.forcelimited = True
     actuator.forcerange[:] = np.array([-effort_limit, effort_limit])
   else:
     actuator.forcelimited = False
+    # No forcerange needed.
 
   # Joint properties.
   spec.joint(joint_name).armature = armature

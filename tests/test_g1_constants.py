@@ -122,3 +122,19 @@ def test_g1_entity_creation(g1_entity) -> None:
   assert g1_entity.num_joints == 29
   assert g1_entity.is_actuated
   assert not g1_entity.is_fixed_base
+
+
+def test_g1_actuators_configured_correctly(g1_model):
+  """Verify that all G1 actuators have correct control and force limiting.
+
+  All 29 G1 actuators should have ctrllimited=False (allowing setpoints beyond
+  joint limits) and forcelimited=True (limiting forces to effort limits).
+  """
+  for i in range(g1_model.nu):
+    actuator_name = g1_model.actuator(i).name
+    assert g1_model.actuator_ctrllimited[i] == 0, (
+      f"Actuator '{actuator_name}' has ctrllimited=True, expected False"
+    )
+    assert g1_model.actuator_forcelimited[i] == 1, (
+      f"Actuator '{actuator_name}' has forcelimited=False, expected True"
+    )
