@@ -39,8 +39,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --no-default-groups --group cu128
-          uv pip install viser
+          uv sync --extra cu128
 
       - name: Build Viser client
         run: |
