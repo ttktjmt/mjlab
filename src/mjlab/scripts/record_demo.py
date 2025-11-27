@@ -69,7 +69,7 @@ def main() -> None:
   from mjlab.tasks.tracking.mdp import MotionCommandCfg
   from mjlab.tasks.tracking.rl import MotionTrackingOnPolicyRunner
   from mjlab.utils.torch import configure_torch_backends
-  from mjlab.viewer.viser_scene import ViserMujocoScene
+  from mjlab.viewer.viser.scene import ViserMujocoScene
 
   configure_torch_backends()
 
