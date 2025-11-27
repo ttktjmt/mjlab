@@ -44,6 +44,9 @@ python -m http.server 8000
 # 4. Open http://localhost:8000 in your browser
 ```
 
+Direct link format for GitHub Pages:
+`https://[username].github.io/mjlab/viser-client/?playbackPath=../recordings/demo.viser`
+
 ## Customization
 
 ### Recording Settings

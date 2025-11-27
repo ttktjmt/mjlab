@@ -165,7 +165,7 @@ def main() -> None:
   )
   print("   2. Deploy to GitHub Pages")
   print(
-    f"   3. Access at: https://[username].github.io/mjlab/viser-client/?recording=../recordings/{record_cfg.output_name}.viser"
+    f"   3. Access at: https://[username].github.io/mjlab/viser-client/?playbackPath=../recordings/{record_cfg.output_name}.viser"
   )
 
 
