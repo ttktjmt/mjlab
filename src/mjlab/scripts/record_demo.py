@@ -8,7 +8,7 @@ Note: This script is designed to run headless for CI/CD environments.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import tyro
@@ -94,7 +94,7 @@ def main() -> None:
   env = RslRlVecEnvWrapper(env)
 
   # Load policy
-  runner = MotionTrackingOnPolicyRunner(env, agent_cfg, device=device)
+  runner = MotionTrackingOnPolicyRunner(env, asdict(agent_cfg), device=device)
   runner.load(checkpoint_path)
   policy = runner.get_inference_policy(device)
 
