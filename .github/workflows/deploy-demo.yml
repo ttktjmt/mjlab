@@ -58,7 +58,8 @@ jobs:
             --output-dir docs/recordings \
             --output-name demo \
             --num-steps 500 \
-            --num-envs 8
+            --num-envs 24 \
+            --frame-skip 1
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
