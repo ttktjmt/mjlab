@@ -43,7 +43,7 @@ jobs:
 
       - name: Build Viser client
         run: |
-          uv run viser-build-client --output-dir docs/viser-client
+          uv run viser-build-client --out-dir docs/viser-client
 
       - name: Record demo
         env:

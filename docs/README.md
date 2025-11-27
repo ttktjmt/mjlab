@@ -35,7 +35,7 @@ uv run python -m mjlab.scripts.record_demo \
   --num-envs 8
 
 # 2. Build Viser client
-uv run viser-build-client --output-dir docs/viser-client
+uv run viser-build-client --out-dir docs/viser-client
 
 # 3. Serve locally
 cd docs
