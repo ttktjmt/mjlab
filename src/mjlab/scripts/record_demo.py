@@ -96,7 +96,7 @@ def main() -> None:
 
   # Load policy
   runner = MotionTrackingOnPolicyRunner(env, asdict(agent_cfg), device=device)
-  runner.load(checkpoint_path)
+  runner.load(checkpoint_path, map_location=torch.device(device))
   policy = runner.get_inference_policy(device)
 
   # Get simulation
