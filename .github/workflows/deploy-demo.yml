@@ -37,6 +37,11 @@ jobs:
           enable-cache: true
           version: "0.9.7"
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libosmesa6-dev libgl1-mesa-glx libglfw3
+
       - name: Install dependencies
         run: |
           uv sync --extra cu128
