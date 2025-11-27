@@ -60,8 +60,9 @@ def main() -> None:
   print(f"🚀 Creating environment and loading policy...")
 
   # Import here to avoid issues with MuJoCo GL context initialization
-  import torch
+  import torch  # type: ignore[import-not-found]
   import viser
+
   from mjlab.envs import ManagerBasedRlEnv
   from mjlab.rl import RslRlVecEnvWrapper
   from mjlab.sim.sim import Simulation
