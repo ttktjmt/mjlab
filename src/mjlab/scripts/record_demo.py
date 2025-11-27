@@ -90,7 +90,7 @@ def main() -> None:
   env_cfg.scene.num_envs = record_cfg.num_envs
 
   # Create environment
-  env = ManagerBasedRlEnv(env_cfg)
+  env = ManagerBasedRlEnv(cfg=env_cfg, device=device)
   env = RslRlVecEnvWrapper(env)
 
   # Load policy
