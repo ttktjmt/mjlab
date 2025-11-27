@@ -2,6 +2,8 @@
 
 This script runs a demo with a pretrained policy and exports the visualization
 as a .viser file that can be embedded in static webpages for GitHub Pages.
+
+Note: This script is designed to run headless for CI/CD environments.
 """
 
 from __future__ import annotations
@@ -10,12 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import tyro
-import viser
 
 from mjlab.scripts.gcs import ensure_default_checkpoint, ensure_default_motion
-from mjlab.scripts.play import PlayConfig, create_env_and_policy
-from mjlab.sim.sim import Simulation
-from mjlab.viewer.viser_scene import ViserMujocoScene
 
 
 @dataclass
@@ -59,17 +57,47 @@ def main() -> None:
     print("Please check your internet connection and try again.")
     return
 
-  # Create play config
-  play_cfg = PlayConfig(
-    checkpoint_file=checkpoint_path,
-    motion_file=motion_path,
-    num_envs=record_cfg.num_envs,
-    viewer="viser",
-    motion_command_sampling_mode="uniform",
-  )
-
   print(f"🚀 Creating environment and loading policy...")
-  env, policy = create_env_and_policy("Mjlab-Tracking-Flat-Unitree-G1", play_cfg)
+
+  # Import here to avoid issues with MuJoCo GL context initialization
+  import torch
+  import viser
+  from mjlab.envs import ManagerBasedRlEnv
+  from mjlab.rl import RslRlVecEnvWrapper
+  from mjlab.sim.sim import Simulation
+  from mjlab.tasks.registry import load_env_cfg, load_rl_cfg
+  from mjlab.tasks.tracking.mdp import MotionCommandCfg
+  from mjlab.tasks.tracking.rl import MotionTrackingOnPolicyRunner
+  from mjlab.utils.torch import configure_torch_backends
+  from mjlab.viewer.viser_scene import ViserMujocoScene
+
+  configure_torch_backends()
+
+  device = "cuda:0" if torch.cuda.is_available() else "cpu"
+  task = "Mjlab-Tracking-Flat-Unitree-G1"
+
+  env_cfg = load_env_cfg(task, play=True)
+  agent_cfg = load_rl_cfg(task)
+
+  # Configure motion
+  assert env_cfg.commands is not None
+  motion_cmd = env_cfg.commands["motion"]
+  assert isinstance(motion_cmd, MotionCommandCfg)
+  motion_cmd.motion_file = motion_path
+  motion_cmd.sampling_mode = "uniform"
+
+  # Override num_envs
+  env_cfg.scene.num_envs = record_cfg.num_envs
+
+  # Create environment
+  env = ManagerBasedRlEnv(env_cfg)
+  env = RslRlVecEnvWrapper(env)
+
+  # Load policy
+  runner = MotionTrackingOnPolicyRunner(env, agent_cfg, device=device)
+  runner.load(checkpoint_path)
+  policy = runner.get_inference_policy(device)
+
   # Get simulation
   sim = env.unwrapped.sim
   assert isinstance(sim, Simulation)
@@ -112,7 +140,9 @@ def main() -> None:
       frame_count += 1
 
       if (step + 1) % 100 == 0:
-        print(f"   Recorded {step + 1}/{record_cfg.num_steps} steps ({frame_count} frames)")
+        print(
+          f"   Recorded {step + 1}/{record_cfg.num_steps} steps ({frame_count} frames)"
+        )
 
   print(f"💾 Saving recording...")
 
@@ -129,9 +159,13 @@ def main() -> None:
   print(f"   Duration: ~{frame_count * record_cfg.sleep_duration:.1f} seconds")
   print()
   print("📝 Next steps:")
-  print("   1. Run 'viser-build-client --out-dir docs/viser-client' to build the viewer")
+  print(
+    "   1. Run 'viser-build-client --out-dir docs/viser-client' to build the viewer"
+  )
   print("   2. Deploy to GitHub Pages")
-  print(f"   3. Access at: https://[username].github.io/mjlab/viser-client/?recording=../recordings/{record_cfg.output_name}.viser")
+  print(
+    f"   3. Access at: https://[username].github.io/mjlab/viser-client/?recording=../recordings/{record_cfg.output_name}.viser"
+  )
 
 
 if __name__ == "__main__":
