@@ -125,7 +125,7 @@ def main() -> None:
   frame_count = 0
   for step in range(record_cfg.num_steps):
     # Run policy
-    obs = env.unwrapped.get_observations()
+    obs = env.get_observations()
     action = policy(obs)
     env.unwrapped.step(action)
 
