@@ -1,0 +1,74 @@
+name: Deploy Demo to GitHub Pages
+
+on:
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+  # Run weekly to keep demo fresh
+  schedule:
+    - cron: '0 0 * * 0'  # Every Sunday at midnight UTC
+  # Also run on pushes to main that modify relevant files
+  push:
+    branches: [main]
+    paths:
+      - 'src/mjlab/scripts/record_demo.py'
+      - '.github/workflows/deploy-demo.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          version: "0.9.7"
+
+      - name: Install dependencies
+        run: |
+          uv sync --no-default-groups --group cu128
+          uv pip install viser
+
+      - name: Build Viser client
+        run: |
+          uv run viser-build-client --output-dir docs/viser-client
+
+      - name: Record demo
+        env:
+          MUJOCO_GL: osmesa
+        run: |
+          uv run python -m mjlab.scripts.record_demo \
+            --output-dir docs/recordings \
+            --output-name demo \
+            --num-steps 500 \
+            --num-envs 8 \
+            --frame-skip 2
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'docs'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

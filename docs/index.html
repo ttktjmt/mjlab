@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mjlab - Interactive Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 2rem;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    .subtitle {
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .viewer-container {
+      width: 100%;
+      max-width: 1400px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    iframe {
+      width: 100%;
+      height: 800px;
+      border: none;
+      display: block;
+    }
+    .info {
+      max-width: 1400px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1.5rem;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+    }
+    .info h2 {
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+    }
+    .info p {
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+    .info a {
+      color: #ffeb3b;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .info a:hover {
+      text-decoration: underline;
+    }
+    footer {
+      padding: 1.5rem;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.3);
+      font-size: 0.9rem;
+    }
+    footer a {
+      color: #ffeb3b;
+      text-decoration: none;
+    }
+    footer a:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 2rem;
+      }
+      iframe {
+        height: 500px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🤖 mjlab</h1>
+    <p class="subtitle">Isaac Lab API powered by MuJoCo-Warp</p>
+  </header>
+
+  <main>
+    <div class="viewer-container">
+      <iframe src="viser-client/?recording=../recordings/demo.viser" title="mjlab Interactive Demo"></iframe>
+    </div>
+
+    <div class="info">
+      <h2>📹 Interactive Demo</h2>
+      <p>
+        This demo shows a Unitree G1 humanoid robot trained with mjlab to track reference motions.
+        The visualization is powered by <a href="https://viser.studio/" target="_blank">Viser</a>, 
+        which allows you to interact with the 3D scene directly in your browser.
+      </p>
+      <p>
+        <strong>Controls:</strong> Use your mouse to rotate, pan, and zoom the camera. 
+        The demo runs at ~60fps and shows 8 parallel environments.
+      </p>
+      <p>
+        Learn more about mjlab on <a href="https://github.com/mujocolab/mjlab" target="_blank">GitHub</a>.
+      </p>
+    </div>
+  </main>
+
+  <footer>
+    <p>
+      Made with ❤️ by the mjlab team | 
+      <a href="https://github.com/mujocolab/mjlab" target="_blank">GitHub</a> | 
+      <a href="https://github.com/mujocolab/mjlab/blob/main/LICENSE" target="_blank">License</a>
+    </p>
+  </footer>
+</body>
+</html>

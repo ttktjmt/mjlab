@@ -16,6 +16,8 @@ and sim-to-real deployment.
 > release yet**. The PyPI package is only a snapshot — for the latest fixes and
 > improvements, install from source or Git.
 
+🎮 **[Try the Interactive Demo](https://ttktjmt.github.io/mjlab/)** — See a trained Unitree G1 humanoid in action, powered by Viser visualization.
+
 ---
 
 ## Quick Start
