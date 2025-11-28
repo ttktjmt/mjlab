@@ -117,6 +117,22 @@ def main() -> None:
   # Reset environment
   env.reset()
 
+  # Set forward velocity command for all environments
+  # Access the command manager and set forward velocity
+  cmd_manager = env.unwrapped.command_manager
+  if "twist" in cmd_manager.active_terms:
+    import torch
+
+    # Get the twist command term and set forward velocity
+    twist_term = cmd_manager.get_term("twist")
+
+    # Set commands to move forward at 1.0 m/s
+    twist_term.command[:, 0] = 1.0  # linear velocity x (forward)
+    twist_term.command[:, 1] = 0.0  # linear velocity y (lateral)
+    twist_term.command[:, 2] = 0.0  # angular velocity z (yaw)
+
+    print("   Command: Forward velocity = 1.0 m/s")
+
   print(f"🎥 Recording {record_cfg.num_steps} steps...")
   print(f"   Task: {record_cfg.task}")
   print(f"   Output: {record_cfg.output_dir / (record_cfg.output_name + '.viser')}")
