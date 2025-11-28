@@ -57,7 +57,7 @@ def main() -> None:
     print("Please check your internet connection and try again.")
     return
 
-  print(f"🚀 Creating environment and loading policy...")
+  print("🚀 Creating environment and loading policy...")
 
   # Import here to avoid issues with MuJoCo GL context initialization
   import torch  # type: ignore[import-not-found]
@@ -103,7 +103,7 @@ def main() -> None:
   sim = env.unwrapped.sim
   assert isinstance(sim, Simulation)
 
-  print(f"📹 Starting recording server...")
+  print("📹 Starting recording server...")
   # Create Viser server
   server = viser.ViserServer(label="mjlab-recording", verbose=False)
 
@@ -145,7 +145,7 @@ def main() -> None:
           f"   Recorded {step + 1}/{record_cfg.num_steps} steps ({frame_count} frames)"
         )
 
-  print(f"💾 Saving recording...")
+  print("💾 Saving recording...")
 
   # Save the recording
   output_path = record_cfg.output_dir / f"{record_cfg.output_name}.viser"
