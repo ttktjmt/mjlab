@@ -91,12 +91,56 @@
     footer a:hover {
       text-decoration: underline;
     }
+    .recording-selector {
+      max-width: 1400px;
+      margin-bottom: 1.5rem;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1rem;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+    }
+    .recording-selector h3 {
+      margin-bottom: 0.75rem;
+      font-size: 1.2rem;
+    }
+    .recording-list {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .recording-btn {
+      padding: 0.75rem 1.5rem;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .recording-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .recording-btn.active {
+      background: #ffeb3b;
+      color: #764ba2;
+      border-color: #ffeb3b;
+    }
     @media (max-width: 768px) {
       h1 {
         font-size: 2rem;
       }
       iframe {
         height: 500px;
+      }
+      .recording-list {
+        flex-direction: column;
+      }
+      .recording-btn {
+        width: 100%;
       }
     }
   </style>
@@ -108,20 +152,32 @@
   </header>
 
   <main>
+    <div class="recording-selector">
+      <h3>📂 Select Recording</h3>
+      <div class="recording-list">
+        <button class="recording-btn active" data-recording="demo.viser" data-description="Motion Tracking (G1 Humanoid)">
+          🎭 Motion Tracking
+        </button>
+        <button class="recording-btn" data-recording="velocity-g1-flat.viser" data-description="Velocity Control (G1 Humanoid)">
+          🏃 Velocity Control
+        </button>
+      </div>
+    </div>
+
     <div class="viewer-container">
-      <iframe src="viser-client/?playbackPath=../recordings/demo.viser" title="mjlab Interactive Demo"></iframe>
+      <iframe id="viser-iframe" src="viser-client/?playbackPath=../recordings/demo.viser" title="mjlab Interactive Demo"></iframe>
     </div>
 
     <div class="info">
-      <h2>📹 Interactive Demo</h2>
-      <p>
+      <h2 id="demo-title">📹 Motion Tracking Demo</h2>
+      <p id="demo-description">
         This demo shows a Unitree G1 humanoid robot trained with mjlab to track reference motions.
-        The visualization is powered by <a href="https://viser.studio/" target="_blank">Viser</a>, 
+        The visualization is powered by <a href="https://viser.studio/" target="_blank">Viser</a>,
         which allows you to interact with the 3D scene directly in your browser.
       </p>
       <p>
-        <strong>Controls:</strong> Use your mouse to rotate, pan, and zoom the camera. 
-        The demo runs at ~60fps and shows 8 parallel environments.
+        <strong>Controls:</strong> Use your mouse to rotate, pan, and zoom the camera.
+        The demo runs at ~60fps and shows multiple parallel environments.
       </p>
       <p>
         Learn more about mjlab on <a href="https://github.com/mujocolab/mjlab" target="_blank">GitHub</a>.
@@ -131,10 +187,51 @@
 
   <footer>
     <p>
-      Made with ❤️ by the mjlab team | 
-      <a href="https://github.com/mujocolab/mjlab" target="_blank">GitHub</a> | 
+      Made with ❤️ by the mjlab team |
+      <a href="https://github.com/mujocolab/mjlab" target="_blank">GitHub</a> |
       <a href="https://github.com/mujocolab/mjlab/blob/main/LICENSE" target="_blank">License</a>
     </p>
   </footer>
+
+  <script>
+    // Recording configurations
+    const recordings = {
+      'demo.viser': {
+        title: 'Motion Tracking Demo',
+        description: 'This demo shows a Unitree G1 humanoid robot trained with mjlab to track reference motions. The visualization is powered by <a href="https://viser.studio/" target="_blank">Viser</a>, which allows you to interact with the 3D scene directly in your browser.'
+      },
+      'velocity-g1-flat.viser': {
+        title: 'Velocity Control Demo',
+        description: 'This demo shows a Unitree G1 humanoid robot trained with mjlab to follow velocity commands. The robot can walk in different directions and speeds based on the commanded linear and angular velocities.'
+      }
+    };
+
+    // Get DOM elements
+    const iframe = document.getElementById('viser-iframe');
+    const demoTitle = document.getElementById('demo-title');
+    const demoDescription = document.getElementById('demo-description');
+    const recordingButtons = document.querySelectorAll('.recording-btn');
+
+    // Handle recording selection
+    recordingButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const recording = button.dataset.recording;
+
+        // Update active state
+        recordingButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+
+        // Update iframe src
+        iframe.src = `viser-client/?playbackPath=../recordings/${recording}`;
+
+        // Update description
+        const config = recordings[recording];
+        if (config) {
+          demoTitle.textContent = `📹 ${config.title}`;
+          demoDescription.innerHTML = config.description;
+        }
+      });
+    });
+  </script>
 </body>
 </html>
