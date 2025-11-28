@@ -37,11 +37,6 @@ jobs:
           enable-cache: true
           version: "0.9.7"
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libosmesa6-dev libglx0 libglfw3
-
       - name: Install dependencies
         run: |
           uv sync --extra cu128
@@ -49,17 +44,6 @@ jobs:
       - name: Build Viser client
         run: |
           uv run viser-build-client --out-dir docs/viser-client
-
-      - name: Record demo
-        env:
-          MUJOCO_GL: osmesa
-        run: |
-          uv run python -m mjlab.scripts.record_demo \
-            --output-dir docs/recordings \
-            --output-name demo \
-            --num-steps 500 \
-            --num-envs 24 \
-            --frame-skip 1
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
