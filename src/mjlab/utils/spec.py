@@ -1,7 +1,41 @@
 """MjSpec utils."""
 
+from typing import Callable
+
 import mujoco
 import numpy as np
+
+
+def auto_wrap_fixed_base_mocap(
+  spec_fn: Callable[[], mujoco.MjSpec],
+) -> Callable[[], mujoco.MjSpec]:
+  """Wraps spec_fn to auto-wrap fixed-base entities in mocap.
+
+  This enables fixed-base entities to be positioned independently per environment.
+  Returns original spec unchanged if entity is floating-base or already mocap.
+  """
+
+  def wrapper() -> mujoco.MjSpec:
+    original_spec = spec_fn()
+
+    # Check if entity has freejoint (floating-base).
+    free_joint = get_free_joint(original_spec)
+    if free_joint is not None:
+      return original_spec  # Floating-base, no wrapping needed.
+
+    # Check if root body is already mocap.
+    root_body = original_spec.bodies[1] if len(original_spec.bodies) > 1 else None
+    if root_body and root_body.mocap:
+      return original_spec  # Already mocap, no wrapping needed.
+
+    # Wrap in mocap body.
+    wrapper_spec = mujoco.MjSpec()
+    mocap_body = wrapper_spec.worldbody.add_body(name="mocap_base", mocap=True)
+    frame = mocap_body.add_frame()
+    wrapper_spec.attach(child=original_spec, prefix="", frame=frame)
+    return wrapper_spec
+
+  return wrapper
 
 
 def get_non_free_joints(spec: mujoco.MjSpec) -> tuple[mujoco.MjsJoint, ...]:

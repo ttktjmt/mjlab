@@ -26,6 +26,14 @@ _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
 def reset_scene_to_default(
   env: ManagerBasedRlEnv, env_ids: torch.Tensor | None
 ) -> None:
+  """Reset all entities in the scene to their default states.
+
+  For floating-base entities: Resets root state (position, orientation, velocities).
+  For fixed-base mocap entities: Resets mocap pose.
+  For all articulated entities: Resets joint positions and velocities.
+
+  Automatically applies env_origins offset to position all entities correctly.
+  """
   if env_ids is None:
     env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
 
@@ -33,15 +41,27 @@ def reset_scene_to_default(
     if not isinstance(entity, Entity):
       continue
 
-    default_root_state = entity.data.default_root_state[env_ids].clone()
-    default_root_state[:, 0:3] += env.scene.env_origins[env_ids]
-    entity.write_root_state_to_sim(default_root_state, env_ids=env_ids)
+    # Reset root/mocap pose.
+    if entity.is_fixed_base and entity.is_mocap:
+      # Fixed-base mocap entity - reset mocap pose with env_origins.
+      default_root_state = entity.data.default_root_state[env_ids].clone()
+      mocap_pose = torch.zeros((len(env_ids), 7), device=env.device)
+      mocap_pose[:, 0:3] = default_root_state[:, 0:3] + env.scene.env_origins[env_ids]
+      mocap_pose[:, 3:7] = default_root_state[:, 3:7]
+      entity.write_mocap_pose_to_sim(mocap_pose, env_ids=env_ids)
+    elif not entity.is_fixed_base:
+      # Floating-base entity - reset root state with env_origins.
+      default_root_state = entity.data.default_root_state[env_ids].clone()
+      default_root_state[:, 0:3] += env.scene.env_origins[env_ids]
+      entity.write_root_state_to_sim(default_root_state, env_ids=env_ids)
 
-    default_joint_pos = entity.data.default_joint_pos[env_ids].clone()
-    default_joint_vel = entity.data.default_joint_vel[env_ids].clone()
-    entity.write_joint_state_to_sim(
-      default_joint_pos, default_joint_vel, env_ids=env_ids
-    )
+    # Reset joint state for articulated entities.
+    if entity.is_articulated:
+      default_joint_pos = entity.data.default_joint_pos[env_ids].clone()
+      default_joint_vel = entity.data.default_joint_vel[env_ids].clone()
+      entity.write_joint_state_to_sim(
+        default_joint_pos, default_joint_vel, env_ids=env_ids
+      )
 
 
 def reset_root_state_uniform(

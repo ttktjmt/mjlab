@@ -90,6 +90,44 @@ class DebugVisualizer(ABC):
     ...
 
   @abstractmethod
+  def add_sphere(
+    self,
+    center: np.ndarray | torch.Tensor,
+    radius: float,
+    color: tuple[float, float, float, float],
+    label: str | None = None,
+  ) -> None:
+    """Add a sphere visualization.
+
+    Args:
+      center: Center position (3D vector).
+      radius: Sphere radius.
+      color: RGBA color (values 0-1).
+      label: Optional label for this sphere.
+    """
+    ...
+
+  @abstractmethod
+  def add_cylinder(
+    self,
+    start: np.ndarray | torch.Tensor,
+    end: np.ndarray | torch.Tensor,
+    radius: float,
+    color: tuple[float, float, float, float],
+    label: str | None = None,
+  ) -> None:
+    """Add a cylinder visualization.
+
+    Args:
+      start: Bottom center position (3D vector).
+      end: Top center position (3D vector).
+      radius: Cylinder radius.
+      color: RGBA color (values 0-1).
+      label: Optional label for this cylinder.
+    """
+    ...
+
+  @abstractmethod
   def clear(self) -> None:
     """Clear all debug visualizations."""
     ...
@@ -117,6 +155,12 @@ class NullDebugVisualizer:
     alpha=1.0,
     axis_colors=None,
   ) -> None:
+    pass
+
+  def add_sphere(self, center, radius, color, label=None) -> None:
+    pass
+
+  def add_cylinder(self, start, end, radius, color, label=None) -> None:
     pass
 
   def clear(self) -> None:

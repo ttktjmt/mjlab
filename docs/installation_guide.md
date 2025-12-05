@@ -75,7 +75,7 @@ uv add --editable /path/to/cloned/mjlab
 Install directly from GitHub without cloning:
 
 ```bash
-uv add "mjlab @ git+https://github.com/mujocolab/mjlab" "mujoco-warp @ git+https://github.com/google-deepmind/mujoco_warp@fb9bf88399796f161a4a2b129d846484da8a4ad0"
+uv add "mjlab @ git+https://github.com/mujocolab/mjlab" "mujoco-warp @ git+https://github.com/google-deepmind/mujoco_warp@9fc294d86955a303619a254cefae809a41adb274"
 ```
 
 > **Note**: `mujoco-warp` must be installed from Git since it's not available on PyPI.
@@ -117,7 +117,7 @@ also use it with any pip-based virtual environment (venv, conda, virtualenv, etc
 
    **From Source (Recommended)**:
    ```bash
-   pip install git+https://github.com/google-deepmind/mujoco_warp@fb9bf88399796f161a4a2b129d846484da8a4ad0
+   pip install git+https://github.com/google-deepmind/mujoco_warp@9fc294d86955a303619a254cefae809a41adb274
    git clone https://github.com/mujocolab/mjlab.git && cd mjlab
    pip install -e .
    ```

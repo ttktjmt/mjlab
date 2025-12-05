@@ -155,6 +155,70 @@ class MujocoNativeDebugVisualizer(DebugVisualizer):
       )
 
   @override
+  def add_sphere(
+    self,
+    center: np.ndarray | torch.Tensor,
+    radius: float,
+    color: tuple[float, float, float, float],
+    label: str | None = None,
+  ) -> None:
+    """Add a sphere visualization using MuJoCo's sphere geometry."""
+    del label  # Unused.
+
+    if isinstance(center, torch.Tensor):
+      center = center.cpu().numpy()
+
+    self.scn.ngeom += 1
+    geom = self.scn.geoms[self.scn.ngeom - 1]
+    geom.category = mujoco.mjtCatBit.mjCAT_DECOR
+
+    mujoco.mjv_initGeom(
+      geom=geom,
+      type=mujoco.mjtGeom.mjGEOM_SPHERE.value,
+      size=np.array([radius, 0, 0]),
+      pos=center,
+      mat=np.eye(3).flatten(),
+      rgba=np.asarray(color, dtype=np.float32),
+    )
+
+  @override
+  def add_cylinder(
+    self,
+    start: np.ndarray | torch.Tensor,
+    end: np.ndarray | torch.Tensor,
+    radius: float,
+    color: tuple[float, float, float, float],
+    label: str | None = None,
+  ) -> None:
+    """Add a cylinder visualization using MuJoCo's cylinder connector."""
+    del label  # Unused.
+
+    if isinstance(start, torch.Tensor):
+      start = start.cpu().numpy()
+    if isinstance(end, torch.Tensor):
+      end = end.cpu().numpy()
+
+    self.scn.ngeom += 1
+    geom = self.scn.geoms[self.scn.ngeom - 1]
+    geom.category = mujoco.mjtCatBit.mjCAT_DECOR
+
+    mujoco.mjv_initGeom(
+      geom=geom,
+      type=mujoco.mjtGeom.mjGEOM_CYLINDER.value,
+      size=np.zeros(3),
+      pos=np.zeros(3),
+      mat=np.zeros(9),
+      rgba=np.asarray(color, dtype=np.float32),
+    )
+    mujoco.mjv_connector(
+      geom=geom,
+      type=mujoco.mjtGeom.mjGEOM_CYLINDER.value,
+      width=radius,
+      from_=start,
+      to=end,
+    )
+
+  @override
   def clear(self) -> None:
     """Clear debug visualizations by resetting geom count."""
     self.scn.ngeom = self._initial_geom_count

@@ -41,7 +41,11 @@ def get_base_metadata(
     joint_name = actuator.target.split("/")[-1]
     joint_name_to_ctrl_id[joint_name] = actuator.id
   # Get actuator IDs in natural joint order (same order as robot.joint_names).
-  ctrl_ids_natural = [joint_name_to_ctrl_id[jname] for jname in robot.joint_names]
+  ctrl_ids_natural = [
+    joint_name_to_ctrl_id[jname]
+    for jname in robot.joint_names  # global joint order
+    if jname in joint_name_to_ctrl_id  # skip non-actuated joints
+  ]
   joint_stiffness = env.sim.mj_model.actuator_gainprm[ctrl_ids_natural, 0]
   joint_damping = -env.sim.mj_model.actuator_biasprm[ctrl_ids_natural, 2]
   return {

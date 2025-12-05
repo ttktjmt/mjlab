@@ -134,6 +134,16 @@ class ViserMujocoScene(DebugVisualizer):
   )
   _arrow_shaft_mesh: trimesh.Trimesh | None = field(default=None, init=False)
   _arrow_head_mesh: trimesh.Trimesh | None = field(default=None, init=False)
+  _queued_spheres: list[tuple[np.ndarray, float, tuple[float, float, float, float]]] = (
+    field(default_factory=list, init=False)
+  )
+  _sphere_handle: viser.BatchedMeshHandle | None = field(default=None, init=False)
+  _sphere_mesh: trimesh.Trimesh | None = field(default=None, init=False)
+  _queued_cylinders: list[
+    tuple[np.ndarray, np.ndarray, float, tuple[float, float, float, float]]
+  ] = field(default_factory=list, init=False)
+  _cylinder_handle: viser.BatchedMeshHandle | None = field(default=None, init=False)
+  _cylinder_mesh: trimesh.Trimesh | None = field(default=None, init=False)
   _viz_data: mujoco.MjData = field(init=False)
 
   @staticmethod
@@ -439,10 +449,12 @@ class ViserMujocoScene(DebugVisualizer):
       body_xpos, body_xmat, mocap_pos, mocap_quat, env_idx, scene_offset, contacts
     )
 
-    # Update scene offset for debug visualizations and sync arrows
+    # Update scene offset for debug visualizations and sync arrows, spheres, cylinders
     if self.debug_visualization_enabled:
       self._scene_offset = scene_offset
       self._sync_arrows()
+      self._sync_spheres()
+      self._sync_cylinders()
 
   def update_from_mjdata(self, mj_data: mujoco.MjData) -> None:
     """Update scene from single-environment MuJoCo data.
@@ -469,10 +481,12 @@ class ViserMujocoScene(DebugVisualizer):
       body_xpos, body_xmat, mocap_pos, mocap_quat, env_idx, scene_offset, contacts
     )
 
-    # Update scene offset for debug visualizations and sync arrows
+    # Update scene offset for debug visualizations and sync arrows, spheres, cylinders
     if self.debug_visualization_enabled:
       self._scene_offset = scene_offset
       self._sync_arrows()
+      self._sync_spheres()
+      self._sync_cylinders()
 
   def _update_visualization(
     self,
@@ -1058,13 +1072,78 @@ class ViserMujocoScene(DebugVisualizer):
       )
 
   @override
+  def add_sphere(
+    self,
+    center: np.ndarray | torch.Tensor,
+    radius: float,
+    color: tuple[float, float, float, float],
+    label: str | None = None,
+  ) -> None:
+    """Queue a sphere for batched rendering.
+
+    Spheres are not rendered immediately but queued and rendered together
+    in the next update() call for efficiency.
+
+    Args:
+      center: Center position (3D vector).
+      radius: Sphere radius.
+      color: RGBA color (values 0-1).
+      label: Optional label for this sphere.
+    """
+    if not self.debug_visualization_enabled:
+      return
+
+    del label  # Unused.
+    if isinstance(center, torch.Tensor):
+      center = center.cpu().numpy()
+
+    # Queue the sphere for batched rendering
+    self._queued_spheres.append((center.copy(), radius, color))
+
+  @override
+  def add_cylinder(
+    self,
+    start: np.ndarray | torch.Tensor,
+    end: np.ndarray | torch.Tensor,
+    radius: float,
+    color: tuple[float, float, float, float],
+    label: str | None = None,
+  ) -> None:
+    """Queue a cylinder for batched rendering.
+
+    Cylinders are not rendered immediately but queued and rendered together
+    in the next update() call for efficiency.
+
+    Args:
+      start: Bottom center position (3D vector).
+      end: Top center position (3D vector).
+      radius: Cylinder radius.
+      color: RGBA color (values 0-1).
+      label: Optional label for this cylinder.
+    """
+    if not self.debug_visualization_enabled:
+      return
+
+    del label  # Unused.
+    if isinstance(start, torch.Tensor):
+      start = start.cpu().numpy()
+    if isinstance(end, torch.Tensor):
+      end = end.cpu().numpy()
+
+    # Queue the cylinder for batched rendering
+    self._queued_cylinders.append((start.copy(), end.copy(), radius, color))
+
+  @override
   def clear(self) -> None:
     """Clear all debug visualizations.
 
-    Clears the arrow queue. Ghost meshes are kept and pose-updated for efficiency
-    within the same environment, but removed when switching environments.
+    Clears the arrow, sphere, and cylinder queues. Ghost meshes are kept and
+    pose-updated for efficiency within the same environment, but removed when
+    switching environments.
     """
     self._queued_arrows.clear()
+    self._queued_spheres.clear()
+    self._queued_cylinders.clear()
 
   def clear_debug_all(self) -> None:
     """Clear all debug visualizations including ghosts.
@@ -1080,6 +1159,16 @@ class ViserMujocoScene(DebugVisualizer):
     if self._arrow_head_handle is not None:
       self._arrow_head_handle.remove()
       self._arrow_head_handle = None
+
+    # Remove sphere meshes
+    if self._sphere_handle is not None:
+      self._sphere_handle.remove()
+      self._sphere_handle = None
+
+    # Remove cylinder meshes
+    if self._cylinder_handle is not None:
+      self._cylinder_handle.remove()
+      self._cylinder_handle = None
 
     # Remove ghost meshes
     for handle in self._ghost_handles.values():
@@ -1234,6 +1323,161 @@ class ViserMujocoScene(DebugVisualizer):
       self._arrow_head_handle.batched_wxyzs = head_wxyzs
       self._arrow_head_handle.batched_scales = head_scales
       self._arrow_head_handle.batched_colors = head_colors
+
+  def _sync_spheres(self) -> None:
+    """Render all queued spheres using batched meshes.
+
+    This should be called after all debug visualizations have been queued
+    for the current frame.
+    """
+    if not self.debug_visualization_enabled:
+      return
+
+    if not self._queued_spheres:
+      # Remove sphere mesh if no spheres to render
+      if self._sphere_handle is not None:
+        self._sphere_handle.remove()
+        self._sphere_handle = None
+      return
+
+    # Create sphere mesh if needed (unit sphere)
+    if self._sphere_mesh is None:
+      self._sphere_mesh = trimesh.creation.icosphere(subdivisions=2, radius=1.0)
+
+    # Prepare batched data
+    num_spheres = len(self._queued_spheres)
+    positions = np.zeros((num_spheres, 3), dtype=np.float32)
+    scales = np.zeros((num_spheres, 3), dtype=np.float32)
+    colors = np.zeros((num_spheres, 3), dtype=np.uint8)
+    opacities = np.zeros(num_spheres, dtype=np.float32)
+
+    # Apply scene offset to all spheres
+    for i, (center, radius, color) in enumerate(self._queued_spheres):
+      positions[i] = center + self._scene_offset
+      scales[i] = [radius, radius, radius]
+      colors[i] = (np.array(color[:3]) * 255).astype(np.uint8)
+      opacities[i] = color[3]
+
+    # Check if we need to recreate handle (number of spheres changed)
+    needs_recreation = self._sphere_handle is None or len(positions) != len(
+      self._sphere_handle.batched_positions
+    )
+
+    if needs_recreation:
+      # Remove old handle
+      if self._sphere_handle is not None:
+        self._sphere_handle.remove()
+
+      # Create new batched mesh
+      # Note: Viser's batched meshes don't support per-instance opacity,
+      # so we use the first sphere's opacity for all spheres
+      self._sphere_handle = self.server.scene.add_batched_meshes_simple(
+        f"/debug/env_{self.env_idx}/spheres",
+        self._sphere_mesh.vertices,
+        self._sphere_mesh.faces,
+        batched_wxyzs=np.tile(np.array([1.0, 0.0, 0.0, 0.0]), (num_spheres, 1)),
+        batched_positions=positions,
+        batched_scales=scales,
+        batched_colors=colors,
+        opacity=opacities[0],  # Use first sphere's opacity
+        cast_shadow=False,
+        receive_shadow=False,
+      )
+    else:
+      # Update existing handle
+      assert self._sphere_handle is not None
+      self._sphere_handle.batched_positions = positions
+      self._sphere_handle.batched_scales = scales
+      self._sphere_handle.batched_colors = colors
+
+  def _sync_cylinders(self) -> None:
+    """Render all queued cylinders using batched meshes.
+
+    This should be called after all debug visualizations have been queued
+    for the current frame.
+    """
+    if not self.debug_visualization_enabled:
+      return
+
+    if not self._queued_cylinders:
+      # Remove cylinder mesh if no cylinders to render
+      if self._cylinder_handle is not None:
+        self._cylinder_handle.remove()
+        self._cylinder_handle = None
+      return
+
+    # Create cylinder mesh if needed (unit cylinder: radius=1, height=1)
+    if self._cylinder_mesh is None:
+      self._cylinder_mesh = trimesh.creation.cylinder(radius=1.0, height=1.0)
+
+    # Prepare batched data
+    num_cylinders = len(self._queued_cylinders)
+    positions = np.zeros((num_cylinders, 3), dtype=np.float32)
+    wxyzs = np.zeros((num_cylinders, 4), dtype=np.float32)
+    scales = np.zeros((num_cylinders, 3), dtype=np.float32)
+    colors = np.zeros((num_cylinders, 3), dtype=np.uint8)
+    opacities = np.zeros(num_cylinders, dtype=np.float32)
+
+    z_axis = np.array([0, 0, 1])
+
+    # Apply scene offset to all cylinders
+    for i, (start, end, radius, color) in enumerate(self._queued_cylinders):
+      # Apply scene offset
+      start_offset = start + self._scene_offset
+      end_offset = end + self._scene_offset
+
+      direction = end_offset - start_offset
+      length = np.linalg.norm(direction)
+
+      if length < 1e-6:
+        # Degenerate cylinder - use identity rotation and zero scale
+        positions[i] = start_offset
+        wxyzs[i] = [1.0, 0.0, 0.0, 0.0]
+        scales[i] = [0.0, 0.0, 0.0]
+      else:
+        direction = direction / length
+        rotation_quat = rotation_quat_from_vectors(z_axis, direction)
+
+        # Position at midpoint
+        positions[i] = (start_offset + end_offset) / 2
+        wxyzs[i] = rotation_quat
+        scales[i] = [radius, radius, length]
+
+      colors[i] = (np.array(color[:3]) * 255).astype(np.uint8)
+      opacities[i] = color[3]
+
+    # Check if we need to recreate handle (number of cylinders changed)
+    needs_recreation = self._cylinder_handle is None or len(positions) != len(
+      self._cylinder_handle.batched_positions
+    )
+
+    if needs_recreation:
+      # Remove old handle
+      if self._cylinder_handle is not None:
+        self._cylinder_handle.remove()
+
+      # Create new batched mesh
+      # Note: Viser's batched meshes don't support per-instance opacity,
+      # so we use the first cylinder's opacity for all cylinders
+      self._cylinder_handle = self.server.scene.add_batched_meshes_simple(
+        f"/debug/env_{self.env_idx}/cylinders",
+        self._cylinder_mesh.vertices,
+        self._cylinder_mesh.faces,
+        batched_wxyzs=wxyzs,
+        batched_positions=positions,
+        batched_scales=scales,
+        batched_colors=colors,
+        opacity=opacities[0],  # Use first cylinder's opacity
+        cast_shadow=False,
+        receive_shadow=False,
+      )
+    else:
+      # Update existing handle
+      assert self._cylinder_handle is not None
+      self._cylinder_handle.batched_positions = positions
+      self._cylinder_handle.batched_wxyzs = wxyzs
+      self._cylinder_handle.batched_scales = scales
+      self._cylinder_handle.batched_colors = colors
 
   @staticmethod
   def _mat_to_quat(mat: np.ndarray) -> np.ndarray:

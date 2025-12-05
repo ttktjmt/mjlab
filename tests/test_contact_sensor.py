@@ -105,7 +105,7 @@ def create_scene_with_sensor(
   sensor_cfg: ContactSensorCfg,
   device: str,
   num_envs: int = 2,
-  njmax: int = 50,
+  njmax: int = 75,
 ) -> tuple[Scene, Simulation]:
   """Helper to create a complete test environment with contact sensor.
 
