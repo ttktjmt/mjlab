@@ -1,31 +1,20 @@
-#!/usr/bin/env python3
 """Generate benchmark report from WandB runs.
 
 This script fetches training metrics from WandB and generates a static HTML
-dashboard similar to ASV (airspeed-velocity) for tracking RL training performance
-over time.
-
-The dashboard shows:
-- Metrics organized by category (Train/, Loss/, Perf/, etc.)
-- Each metric shows a timeline of final values across runs
-- Easy to spot regressions at a glance
-
-Usage:
-    python scripts/benchmarks/generate_report.py --run-path <entity/project/run_id>
-    python scripts/benchmarks/generate_report.py --project mjlab --tag nightly
+dashboard for tracking RL training performance over time.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+import tyro
 import wandb
 
-# Metric categories to fetch (prefix matching)
+# Metric categories to fetch (prefix matching).
 METRIC_CATEGORIES = [
   "Train/",
   "Metrics/",
@@ -41,18 +30,17 @@ def fetch_run_data(run_path: str) -> dict:
   """Fetch final metrics from a single WandB run (summary only, no history).
 
   Args:
-      run_path: Full run path in format "entity/project/run_id"
+    run_path: Full run path in format "entity/project/run_id"
 
   Returns:
-      Dictionary containing run metadata and final metric values
+    Dictionary containing run metadata and final metric values
   """
   api = wandb.Api()
   run = api.run(run_path)
 
-  # Get summary (final values) - this is fast
   summary = dict(run.summary)
 
-  # Filter to only metrics in our categories
+  # Filter to only metrics in our categories.
   filtered_summary = {
     k: v
     for k, v in summary.items()
@@ -122,11 +110,10 @@ def generate_html_report(runs: list[dict], output_dir: Path) -> None:
   """
   output_dir.mkdir(parents=True, exist_ok=True)
 
-  # Save run data as JSON for the dashboard
   data_dir = output_dir / "data"
   data_dir.mkdir(exist_ok=True)
 
-  # Collect all metrics across all runs, grouped by category
+  # Collect all metrics across runs, grouped by category.
   all_metrics: dict[str, set[str]] = defaultdict(set)
   for run in runs:
     for key in run.get("summary", {}).keys():
@@ -137,10 +124,8 @@ def generate_html_report(runs: list[dict], output_dir: Path) -> None:
           all_metrics[category].add(short_name)
           break
 
-  # Process runs into format needed by dashboard
   processed_runs = []
   for run in runs:
-    # Group this run's metrics by category
     metrics_by_category: dict[str, dict[str, float]] = defaultdict(dict)
     for key, value in run.get("summary", {}).items():
       for cat in METRIC_CATEGORIES:
@@ -162,11 +147,9 @@ def generate_html_report(runs: list[dict], output_dir: Path) -> None:
       }
     )
 
-  # Write processed data
   with open(data_dir / "runs.json", "w") as f:
     json.dump(processed_runs, f, indent=2, default=str)
 
-  # Generate index.html
   html_content = generate_dashboard_html(
     processed_runs, {k: sorted(v) for k, v in all_metrics.items()}
   )
@@ -471,10 +454,9 @@ def generate_dashboard_html(runs: list[dict], metrics_by_category: dict) -> str:
         const runs = {runs_json};
         const metricsByCategory = {metrics_json};
 
-        // Sort runs by date (oldest first)
+        // Sort runs by date, oldest first.
         runs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-        // Colors for charts
         const chartColors = {{
             'Train': '#3fb950',
             'Metrics': '#58a6ff',
@@ -485,7 +467,6 @@ def generate_dashboard_html(runs: list[dict], metrics_by_category: dict) -> str:
             'Policy': '#d2a8ff'
         }};
 
-        // Chart.js defaults
         Chart.defaults.color = '#8b949e';
         Chart.defaults.borderColor = '#30363d';
 
@@ -589,7 +570,6 @@ def generate_dashboard_html(runs: list[dict], metrics_by_category: dict) -> str:
         function initCategories() {{
             const container = document.getElementById('categories-container');
 
-            // Sort categories in preferred order
             const categoryOrder = ['Train', 'Loss', 'Perf', 'Metrics', 'Episode_Reward', 'Episode_Termination', 'Policy'];
             const sortedCategories = Object.keys(metricsByCategory).sort((a, b) => {{
                 const aIdx = categoryOrder.indexOf(a);
@@ -669,7 +649,7 @@ def generate_dashboard_html(runs: list[dict], metrics_by_category: dict) -> str:
                 return;
             }}
 
-            // Show newest first
+            // Show newest first.
             const sortedRuns = [...runs].reverse();
 
             tbody.innerHTML = sortedRuns.map(run => `
@@ -682,7 +662,6 @@ def generate_dashboard_html(runs: list[dict], metrics_by_category: dict) -> str:
             `).join('');
         }}
 
-        // Initialize
         initSummary();
         initCategories();
         initTable();
@@ -692,70 +671,38 @@ def generate_dashboard_html(runs: list[dict], metrics_by_category: dict) -> str:
 """
 
 
-def main():
-  parser = argparse.ArgumentParser(
-    description="Generate benchmark report from WandB runs"
-  )
-  parser.add_argument(
-    "--run-path",
-    type=str,
-    action="append",
-    dest="run_paths",
-    help="Run path (entity/project/run_id). Can be specified multiple times.",
-  )
-  parser.add_argument(
-    "--entity",
-    type=str,
-    default="rll_humanoid",
-    help="WandB entity",
-  )
-  parser.add_argument(
-    "--project",
-    type=str,
-    default="mjlab",
-    help="WandB project name",
-  )
-  parser.add_argument(
-    "--tag",
-    type=str,
-    help="Filter runs by tag (e.g., 'nightly')",
-  )
-  parser.add_argument(
-    "--limit",
-    type=int,
-    default=30,
-    help="Maximum number of runs to fetch",
-  )
-  parser.add_argument(
-    "--output-dir",
-    type=Path,
-    default=Path("benchmark_results"),
-    help="Output directory for generated report",
-  )
+def main(
+  run_paths: list[str] | None = None,
+  entity: str = "rll_humanoid",
+  project: str = "mjlab",
+  tag: str | None = None,
+  limit: int = 30,
+  output_dir: Path = Path("benchmark_results"),
+) -> None:
+  """Generate benchmark report from WandB runs.
 
-  args = parser.parse_args()
-
-  if args.run_paths:
-    # Fetch specified runs
+  Args:
+    run_paths: Run paths (entity/project/run_id). Can specify multiple.
+    entity: WandB entity.
+    project: WandB project name.
+    tag: Filter runs by tag (e.g., 'nightly').
+    limit: Maximum number of runs to fetch.
+    output_dir: Output directory for generated report.
+  """
+  if run_paths:
     runs = []
-    for run_path in args.run_paths:
+    for run_path in run_paths:
       print(f"Fetching run: {run_path}")
       runs.append(fetch_run_data(run_path))
   else:
-    # Fetch from project
-    print(f"Fetching runs from {args.entity}/{args.project}")
-    if args.tag:
-      print(f"Filtering by tag: {args.tag}")
-    runs = fetch_project_runs(
-      args.entity,
-      args.project,
-      args.tag,
-      args.limit,
-    )
+    print(f"Fetching runs from {entity}/{project}")
+    if tag:
+      print(f"Filtering by tag: {tag}")
+    runs = fetch_project_runs(entity, project, tag, limit)
 
   print(f"Found {len(runs)} run(s)")
-  generate_html_report(runs, args.output_dir)
+  generate_html_report(runs, output_dir)
 
 
 if __name__ == "__main__":
-  main()
+  tyro.cli(main)

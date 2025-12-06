@@ -1,8 +1,9 @@
 # Systemd Setup for Nightly Benchmarks
 
-This directory contains systemd user service and timer files for running nightly MJLab benchmarks.
+This directory contains systemd user service and timer files for running nightly
+MJLab benchmarks.
 
-## Quick Setup
+## Setup
 
 ```bash
 # 1. Create user systemd directory if it doesn't exist
@@ -62,22 +63,3 @@ Edit `~/.config/systemd/user/mjlab-nightly.timer` to change the schedule:
 - `OnCalendar=*-*-* 02:00:00` - Default: 2 AM daily
 - `OnCalendar=Mon *-*-* 02:00:00` - Example: Mondays only at 2 AM
 - `OnCalendar=*-*-* 02,14:00:00` - Example: Twice daily at 2 AM and 2 PM
-
-## Troubleshooting
-
-**Timer not running when logged out:**
-```bash
-sudo loginctl enable-linger $USER
-```
-
-**Service fails to start:**
-```bash
-# Check logs for errors
-journalctl --user -u mjlab-nightly.service -e
-
-# Test the script manually
-/home/kevin/dev/mjlab/scripts/benchmarks/nightly_train.sh
-```
-
-**GPU not found:**
-Make sure the CUDA environment is properly set up in the service file.
