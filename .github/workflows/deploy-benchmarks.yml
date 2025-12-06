@@ -1,15 +1,13 @@
 name: Deploy Benchmarks
 
 on:
-  # Manual trigger with optional WandB run path
   workflow_dispatch:
     inputs:
       run_path:
-        description: 'WandB run path (entity/project/run_id) - leave empty to fetch recent nightly runs'
+        description: 'WandB run path (entity/project/run_id) - leave empty to fetch nightly runs'
         required: false
         type: string
 
-  # Deploy when benchmark results are pushed
   push:
     branches:
       - gh-pages
@@ -44,20 +42,25 @@ jobs:
           if [ -n "${{ inputs.run_path }}" ]; then
             uv run python scripts/benchmarks/generate_report.py \
               --run-path "${{ inputs.run_path }}" \
-              --output-dir benchmark_results
+              --output-dir nightly
           else
             uv run python scripts/benchmarks/generate_report.py \
               --tag nightly \
-              --output-dir benchmark_results
+              --output-dir nightly
           fi
+
+      - name: Prepare deploy
+        run: |
+          mkdir -p _site/nightly
+          cp -r nightly/* _site/nightly/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: benchmark_results
+          path: _site
 
-  prepare-from-branch:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/gh-pages'
+  deploy-from-branch:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout gh-pages
@@ -71,8 +74,8 @@ jobs:
           path: .
 
   deploy:
-    needs: [generate, prepare-from-branch]
-    if: always() && (needs.generate.result == 'success' || needs.prepare-from-branch.result == 'success')
+    needs: [generate, deploy-from-branch]
+    if: always() && (needs.generate.result == 'success' || needs.deploy-from-branch.result == 'success')
     runs-on: ubuntu-latest
     environment:
       name: github-pages

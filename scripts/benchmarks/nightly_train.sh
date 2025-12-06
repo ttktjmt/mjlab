@@ -89,8 +89,9 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
         git rm -rf . 2>/dev/null || true
     fi
 
-    # Copy report files
-    cp -r "$REPORT_DIR"/* .
+    # Copy report files to nightly/ subdirectory
+    mkdir -p nightly
+    cp -r "$REPORT_DIR"/* nightly/
 
     # Commit and push
     git add -A
