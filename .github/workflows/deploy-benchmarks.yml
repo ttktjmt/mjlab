@@ -41,7 +41,7 @@ jobs:
         run: |
           if [ -n "${{ inputs.run_path }}" ]; then
             uv run python scripts/benchmarks/generate_report.py \
-              --run-path "${{ inputs.run_path }}" \
+              --run-paths ${{ inputs.run_path }} \
               --output-dir nightly
           else
             uv run python scripts/benchmarks/generate_report.py \
