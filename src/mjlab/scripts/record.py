@@ -1,23 +1,4 @@
-"""Script to record RL agent demonstrations and export as .viser files.
-
-This script follows the same patterns as play.py but exports recordings
-that can be embedded in static webpages (e.g., GitHub Pages).
-
-Usage examples:
-  # Using WandB checkpoint
-  uv run record Mjlab-Velocity-Flat-Unitree-G1 --wandb-run-path org/project/run-id
-
-  # Using local checkpoint
-  uv run record Mjlab-Cartpole --checkpoint-file logs/rsl_rl/cartpole/model_60.pt
-
-  # Custom output settings
-  uv run record Mjlab-Tracking-Flat-Unitree-G1 \\
-    --wandb-run-path org/project/run-id \\
-    --output-dir recordings \\
-    --output-name my-demo \\
-    --num-steps 1000 \\
-    --num-envs 4
-"""
+"""Script to record RL agent demonstrations and export as .viser files."""
 
 import sys
 from dataclasses import asdict, dataclass
@@ -40,37 +21,16 @@ class RecordConfig:
   """Configuration for recording demonstrations."""
 
   wandb_run_path: str | None = None
-  """WandB run path (e.g., 'entity/project/run-id') to download checkpoint."""
-
   checkpoint_file: str | None = None
-  """Path to local checkpoint file (.pt)."""
-
   motion_file: str | None = None
-  """Path to motion file for tracking tasks. If not provided, will try to resolve from WandB."""
-
   num_envs: int | None = None
-  """Number of parallel environments to visualize. If None, uses task default."""
-
   device: str | None = None
-  """Device to run on (e.g., 'cuda:0', 'cpu'). Auto-detected if not provided."""
-
   output_dir: Path = Path("recordings")
-  """Directory to save .viser recordings."""
-
   output_name: str | None = None
-  """Name for the output file (without .viser extension). If None, auto-generated from task."""
-
   num_steps: int = 500
-  """Number of simulation steps to record."""
-
   frame_skip: int = 2
-  """Only record every Nth frame (1 = record all frames)."""
-
   sleep_duration: float = 0.016
-  """Sleep duration between frames in seconds (default: ~60fps)."""
-
   share: bool = False
-  """Generate shareable URL for remote viewing during recording."""
 
 
 def _generate_output_name(task_id: str) -> str:
@@ -130,9 +90,7 @@ def run_record(task_id: str, cfg: RecordConfig):
         )
       if cfg.wandb_run_path is not None:
         wandb_run = api.run(str(cfg.wandb_run_path))
-        art = next(
-          (a for a in wandb_run.used_artifacts() if a.type == "motions"), None
-        )
+        art = next((a for a in wandb_run.used_artifacts() if a.type == "motions"), None)
         if art is None:
           raise RuntimeError("No motion artifact found in the run.")
         motion_cmd.motion_file = str(Path(art.download()) / "motion.npz")
