@@ -136,10 +136,7 @@ jobs:
           </head>
           <body>
             <div class="container">
-              <h1>MJLab MyoSuite Recording</h1>
-              <p class="description">
-                3D visualization of trained agent in MyoSuite environment
-              </p>
+              <h1>MJLab Recording</h1>
               <div class="controls">
                 <label for="recording-select">Select Recording:</label>
                 <select id="recording-select">
