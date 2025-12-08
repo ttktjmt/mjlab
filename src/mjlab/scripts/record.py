@@ -28,7 +28,7 @@ class RecordConfig:
   output_dir: Path = Path("recordings")
   output_name: str | None = None
   num_steps: int = 500
-  frame_skip: int = 2
+  frame_skip: int = 0
   sleep_duration: float = 0.016
   share: bool = False
 
@@ -49,6 +49,37 @@ def _generate_output_name(task_id: str) -> str:
     return f"{task_type}-{robot}"
   else:
     return name
+
+
+def _get_next_available_path(base_path: Path) -> Path:
+  """Find next available file path with automatic numbering.
+
+  Args:
+    base_path: Base file path (e.g., recordings/velocity-g1.viser)
+
+  Returns:
+    Next available path with incremental numbering if needed.
+
+  Examples:
+    velocity-g1.viser -> velocity-g1.viser (if doesn't exist)
+    velocity-g1.viser -> velocity-g1_2.viser (if first exists)
+    velocity-g1.viser -> velocity-g1_3.viser (if first two exist)
+  """
+  if not base_path.exists():
+    return base_path
+
+  # Extract stem and suffix
+  stem = base_path.stem  # e.g., "velocity-g1"
+  suffix = base_path.suffix  # e.g., ".viser"
+  parent = base_path.parent
+
+  # Try incrementing numbers until we find an available filename
+  counter = 2
+  while True:
+    new_path = parent / f"{stem}_{counter}{suffix}"
+    if not new_path.exists():
+      return new_path
+    counter += 1
 
 
 def run_record(task_id: str, cfg: RecordConfig):
@@ -191,8 +222,9 @@ def run_record(task_id: str, cfg: RecordConfig):
     action = policy(obs)
     env.unwrapped.step(action)
 
-    # Update visualization (only every Nth frame)
-    if step % cfg.frame_skip == 0:
+    # Update visualization (record every frame if frame_skip <= 1, else every Nth frame)
+    should_record = cfg.frame_skip <= 1 or step % cfg.frame_skip == 0
+    if should_record:
       with server.atomic():
         scene.update(sim.wp_data)
         server.flush()
@@ -208,8 +240,9 @@ def run_record(task_id: str, cfg: RecordConfig):
 
   print("[INFO]: Saving recording...")
 
-  # Save the recording
-  output_path = cfg.output_dir / f"{output_name}.viser"
+  # Save the recording with automatic filename incrementing
+  base_output_path = cfg.output_dir / f"{output_name}.viser"
+  output_path = _get_next_available_path(base_output_path)
   with output_path.open("wb") as f:
     f.write(serializer.serialize())
 
