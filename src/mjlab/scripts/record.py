@@ -96,7 +96,6 @@ def run_record(task_id: str, cfg: RecordConfig):
         motion_cmd.motion_file = str(Path(art.download()) / "motion.npz")
 
   # Get checkpoint path (same logic as play.py)
-  log_dir: Path | None = None
   resume_path: Path | None = None
 
   log_root_path = (Path("logs") / "rsl_rl" / agent_cfg.experiment_name).resolve()
@@ -120,7 +119,6 @@ def run_record(task_id: str, cfg: RecordConfig):
     print(
       f"[INFO]: Loading checkpoint: {checkpoint_name} (run: {run_id}, {cached_str})"
     )
-  log_dir = resume_path.parent
 
   # Override num_envs if specified
   if cfg.num_envs is not None:
