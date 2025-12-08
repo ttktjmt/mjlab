@@ -1,0 +1,89 @@
+name: Deploy Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_path:
+        description: 'WandB run path (entity/project/run_id) - leave empty to fetch nightly runs'
+        required: false
+        type: string
+
+  push:
+    branches:
+      - gh-pages
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          version: "0.9.14"
+
+      - name: Generate benchmark report
+        env:
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+        run: |
+          if [ -n "${{ inputs.run_path }}" ]; then
+            uv run python scripts/benchmarks/generate_report.py \
+              --run-paths ${{ inputs.run_path }} \
+              --output-dir nightly
+          else
+            uv run python scripts/benchmarks/generate_report.py \
+              --tag nightly \
+              --output-dir nightly
+          fi
+
+      - name: Prepare deploy
+        run: |
+          mkdir -p _site/nightly
+          cp -r nightly/* _site/nightly/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy-from-branch:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: [generate, deploy-from-branch]
+    if: always() && (needs.generate.result == 'success' || needs.deploy-from-branch.result == 'success')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
