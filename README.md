@@ -4,6 +4,7 @@
 
 <p align="left">
   <img alt="tests" src="https://github.com/mujocolab/mjlab/actions/workflows/ci.yml/badge.svg" />
+  <a href="https://mujocolab.github.io/mjlab/nightly/"><img alt="benchmarks" src="https://img.shields.io/badge/nightly-blue" /></a>
 </p>
 
 mjlab combines [Isaac Lab](https://github.com/isaac-sim/IsaacLab)'s proven API
