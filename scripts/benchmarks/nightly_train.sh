@@ -1,26 +1,25 @@
 #!/bin/bash
 # Nightly training script for MJLab benchmarks
 #
-# This script runs the tracking benchmark and generates a report.
+# This script clones mjlab fresh, runs the tracking benchmark, and generates a report.
 # It is designed to be called by a systemd timer or cron job.
 #
 # Usage:
 #   ./scripts/benchmarks/nightly_train.sh
 #
 # Environment variables:
-#   MJLAB_DIR: Path to mjlab repository (default: script directory)
 #   CUDA_DEVICE: GPU device to use (default: 0)
 #   WANDB_TAGS: Comma-separated tags for the run (default: nightly)
 #   SKIP_TRAINING: Set to "1" to skip training and only generate report
+#   SKIP_THROUGHPUT: Set to "1" to skip throughput benchmarking
 
 set -euo pipefail
 
 # Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MJLAB_DIR="${MJLAB_DIR:-$(dirname "$(dirname "$SCRIPT_DIR")")}"
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
 WANDB_TAGS="${WANDB_TAGS:-nightly}"
 SKIP_TRAINING="${SKIP_TRAINING:-0}"
+SKIP_THROUGHPUT="${SKIP_THROUGHPUT:-0}"
 
 # Training configuration
 TASK="Mjlab-Tracking-Flat-Unitree-G1"
@@ -28,9 +27,10 @@ NUM_ENVS=4096
 MAX_ITERATIONS=6000
 REGISTRY_NAME="rll_humanoid/wandb-registry-Motions/side_kick_test"
 
-# Report output
-REPORT_DIR="${MJLAB_DIR}/benchmark_results"
+REPO_URL="git@github.com:mujocolab/mjlab.git"
 GH_PAGES_BRANCH="gh-pages"
+WORK_DIR="/tmp/mjlab-nightly-$$"
+GH_PAGES_DIR="/tmp/mjlab-gh-pages-$$"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -41,11 +41,27 @@ error() {
     exit 1
 }
 
-cd "$MJLAB_DIR" || error "Failed to cd to $MJLAB_DIR"
+cleanup() {
+    if [[ -d "$WORK_DIR" ]]; then
+        log "Cleaning up work directory..."
+        rm -rf "$WORK_DIR"
+    fi
+    if [[ -d "$GH_PAGES_DIR" ]]; then
+        log "Cleaning up gh-pages clone..."
+        rm -rf "$GH_PAGES_DIR"
+    fi
+}
+trap cleanup EXIT
+
+# Clone fresh copy of mjlab
+log "Cloning mjlab..."
+git clone "$REPO_URL" "$WORK_DIR"
+cd "$WORK_DIR"
 
 log "Starting nightly benchmark run"
 log "Task: $TASK"
 log "GPU: $CUDA_DEVICE"
+log "Commit: $(git rev-parse HEAD)"
 
 # Run training
 if [[ "$SKIP_TRAINING" != "1" ]]; then
@@ -55,56 +71,60 @@ if [[ "$SKIP_TRAINING" != "1" ]]; then
         --env.scene.num-envs "$NUM_ENVS" \
         --agent.max-iterations "$MAX_ITERATIONS" \
         --registry-name "$REGISTRY_NAME" \
-        --agent.wandb-tags "[$WANDB_TAGS]"
+        --agent.wandb-tags "$WANDB_TAGS"
 
     log "Training completed"
 else
     log "Skipping training (SKIP_TRAINING=1)"
 fi
 
-# Generate report
+# Clone gh-pages branch (shallow clone for speed)
+log "Cloning gh-pages branch..."
+if git ls-remote --exit-code --heads origin "$GH_PAGES_BRANCH" > /dev/null 2>&1; then
+    git clone --branch "$GH_PAGES_BRANCH" --depth 1 "$REPO_URL" "$GH_PAGES_DIR"
+else
+    # Create new gh-pages branch
+    mkdir -p "$GH_PAGES_DIR"
+    cd "$GH_PAGES_DIR"
+    git init
+    git remote add origin "$REPO_URL"
+    git checkout -b "$GH_PAGES_BRANCH"
+    cd "$WORK_DIR"
+fi
+
+# Copy cached data if exists
+REPORT_DIR="$GH_PAGES_DIR/nightly"
+mkdir -p "$REPORT_DIR"
+
+# Run throughput benchmark
+if [[ "$SKIP_THROUGHPUT" != "1" ]]; then
+    log "Running throughput benchmark..."
+    CUDA_VISIBLE_DEVICES="$CUDA_DEVICE" uv run python scripts/benchmarks/measure_throughput.py \
+        --num-envs "$NUM_ENVS" \
+        --output-dir "$REPORT_DIR"
+    log "Throughput benchmark completed"
+else
+    log "Skipping throughput benchmark (SKIP_THROUGHPUT=1)"
+fi
+
+# Generate report (uses cached data.json if present, only evaluates new runs)
 log "Generating benchmark report..."
 uv run python scripts/benchmarks/generate_report.py \
+    --entity gcbc_researchers \
     --tag nightly \
     --output-dir "$REPORT_DIR"
 
-log "Report generated at $REPORT_DIR"
+log "Report generated"
 
-# Deploy to GitHub Pages (if on a machine with git configured)
-if git rev-parse --git-dir > /dev/null 2>&1; then
-    log "Deploying to GitHub Pages..."
-
-    # Save current branch
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-    # Stash any uncommitted changes
-    git stash push -m "nightly-benchmark-stash" --quiet 2>/dev/null || true
-
-    # Create or switch to gh-pages branch
-    if git show-ref --verify --quiet "refs/heads/$GH_PAGES_BRANCH"; then
-        git checkout "$GH_PAGES_BRANCH"
-        git pull origin "$GH_PAGES_BRANCH" --rebase 2>/dev/null || true
-    else
-        git checkout --orphan "$GH_PAGES_BRANCH"
-        git rm -rf . 2>/dev/null || true
-    fi
-
-    # Copy report files to nightly/ subdirectory
-    mkdir -p nightly
-    cp -r "$REPORT_DIR"/* nightly/
-
-    # Commit and push
-    git add -A
-    git commit -m "Update nightly benchmarks $(date '+%Y-%m-%d')" || log "No changes to commit"
-    git push origin "$GH_PAGES_BRANCH" || log "Failed to push (may need manual push)"
-
-    # Return to original branch
-    git checkout "$CURRENT_BRANCH"
-    git stash pop --quiet 2>/dev/null || true
-
-    log "Deployed to GitHub Pages"
+# Commit and push
+cd "$GH_PAGES_DIR"
+git add -A
+if git diff --staged --quiet; then
+    log "No changes to commit"
 else
-    log "Not in a git repository, skipping GitHub Pages deployment"
+    git commit -m "Update nightly tracking benchmark $(date '+%Y-%m-%d')"
+    git push origin "$GH_PAGES_BRANCH" || log "Failed to push"
+    log "Deployed to GitHub Pages"
 fi
 
 log "Nightly benchmark complete"
