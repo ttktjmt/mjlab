@@ -33,24 +33,6 @@ class RecordConfig:
   share: bool = False
 
 
-def _generate_output_name(task_id: str) -> str:
-  """Generate output name from task ID.
-
-  Examples:
-    Mjlab-Velocity-Flat-Unitree-G1 -> velocity-g1
-    Mjlab-Tracking-Flat-Unitree-G1 -> tracking-g1
-    Mjlab-Cartpole -> cartpole
-  """
-  name = task_id.replace("Mjlab-", "").lower()
-  parts = name.split("-")
-  if len(parts) >= 2:
-    task_type = parts[0]
-    robot = parts[-1]
-    return f"{task_type}-{robot}"
-  else:
-    return name
-
-
 def _get_next_available_path(base_path: Path) -> Path:
   """Find next available file path with automatic numbering.
 
@@ -205,7 +187,7 @@ def run_record(task_id: str, cfg: RecordConfig):
   env.reset()
 
   # Generate output name if not provided
-  output_name = cfg.output_name or _generate_output_name(task_id)
+  output_name = cfg.output_name or task_id.replace("Mjlab-", "").lower()
 
   # Ensure output directory exists
   cfg.output_dir.mkdir(parents=True, exist_ok=True)
