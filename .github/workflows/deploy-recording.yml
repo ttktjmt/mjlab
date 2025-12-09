@@ -49,10 +49,16 @@ jobs:
           ls -1 *.viser 2>/dev/null | jq -R -s -c 'split("\n") | map(select(length > 0))' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Organize files for deployment
+        run: |
+          mkdir -p rec
+          mv viser-client rec/
+          mv recordings rec/
+
       - name: Create index.html
         run: |
           RECORDINGS_JSON='${{ steps.recordings.outputs.files }}'
-          cat > index.html << 'EOF'
+          cat > rec/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -182,7 +188,7 @@ jobs:
           EOF
 
           # Replace placeholder with actual recordings JSON
-          sed -i "s|RECORDINGS_PLACEHOLDER|${RECORDINGS_JSON}|g" index.html
+          sed -i "s|RECORDINGS_PLACEHOLDER|${RECORDINGS_JSON}|g" rec/index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
