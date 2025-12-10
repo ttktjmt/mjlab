@@ -99,6 +99,18 @@ mkdir -p "$REPORT_DIR"
 # Run throughput benchmark
 if [[ "$SKIP_THROUGHPUT" != "1" ]]; then
     log "Running throughput benchmark..."
+
+    # Kill any processes running on the target GPU to ensure clean measurements
+    log "Clearing GPU $CUDA_DEVICE..."
+    gpu_pids=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader,nounits -i "$CUDA_DEVICE" 2>/dev/null || true)
+    if [[ -n "$gpu_pids" ]]; then
+        for pid in $gpu_pids; do
+            log "Killing process $pid on GPU $CUDA_DEVICE"
+            kill -9 "$pid" 2>/dev/null || true
+        done
+        sleep 2  # Wait for processes to fully terminate
+    fi
+
     CUDA_VISIBLE_DEVICES="$CUDA_DEVICE" uv run python scripts/benchmarks/measure_throughput.py \
         --num-envs "$NUM_ENVS" \
         --output-dir "$REPORT_DIR"

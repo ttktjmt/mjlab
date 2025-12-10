@@ -82,6 +82,7 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
   metrics_json = json.dumps(METRICS)
   throughput_json = json.dumps(throughput_data, default=str)
   timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+  github_repo = "https://github.com/mujocolab/mjlab"
 
   return f"""<!DOCTYPE html>
 <html lang="en">
@@ -249,6 +250,50 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
             margin: 1.5rem 0 1rem 0;
             color: var(--text-dim);
         }}
+        .runs-details {{
+            margin-top: 1.5rem;
+        }}
+        .runs-details summary {{
+            cursor: pointer;
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-weight: 500;
+            color: var(--text-dim);
+        }}
+        .runs-details summary:hover {{
+            border-color: var(--accent);
+        }}
+        .runs-details[open] summary {{
+            border-radius: 8px 8px 0 0;
+            border-bottom: none;
+        }}
+        .runs-details table {{
+            border-radius: 0 0 8px 8px;
+        }}
+        .info-box {{
+            margin-bottom: 1.5rem;
+        }}
+        .info-box summary {{
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--accent);
+            font-weight: 500;
+        }}
+        .info-box summary:hover {{
+            text-decoration: underline;
+        }}
+        .info-box p {{
+            margin-top: 0.75rem;
+            padding: 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: var(--text-dim);
+        }}
     </style>
 </head>
 <body>
@@ -263,44 +308,71 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
     </header>
 
     <div class="tabs">
-        <button class="tab active" data-tab="training">Training Metrics</button>
+        <button class="tab active" data-tab="tracking">Tracking Eval</button>
         <button class="tab" data-tab="throughput">Throughput</button>
     </div>
 
-    <div id="training" class="tab-content active">
+    <div id="tracking" class="tab-content active">
+        <details class="info-box">
+            <summary>What is this?</summary>
+            <p>
+              Every night, we train a policy to imitate a reference motion on the Unitree G1 using the latest MJLab commit.
+              The trained policy is then evaluated across 1024 trials, with the results logged here to catch regressions over time.
+            </p>
+        </details>
         <div class="summary" id="summary"></div>
         <div class="charts" id="charts"></div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Commit</th>
-                    <th>Run</th>
-                    <th>Success Rate</th>
-                    <th>MPKPE (m)</th>
-                    <th>EE Pos Error (m)</th>
-                </tr>
-            </thead>
-            <tbody id="table-body"></tbody>
-        </table>
+        <details class="runs-details">
+            <summary>All Runs</summary>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Commit</th>
+                        <th>Run</th>
+                        <th>Success Rate</th>
+                        <th>MPKPE (m)</th>
+                        <th>EE Pos Error (m)</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </details>
     </div>
 
     <div id="throughput" class="tab-content">
+        <details class="info-box">
+            <summary>What is this?</summary>
+            <p>
+                Measures simulation throughput (steps per second) for different tasks.
+                <strong>Physics FPS</strong> is raw MuJoCo stepping speed (just <code>mj_step</code>).
+                <strong>Env FPS</strong> is the full environment step including observations, rewards,
+                terminations, and resets. <strong>Overhead</strong> is the percentage slowdown from
+                environment logic on top of physics.
+            </p>
+            <p>
+                Note: These benchmarks use zero actions, which causes frequent terminations and resets.
+                This represents a worst-case scenario for overhead since resets are expensive.
+            </p>
+        </details>
         <div class="summary" id="throughput-summary"></div>
         <div class="charts" id="throughput-charts"></div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Commit</th>
-                    <th>Task</th>
-                    <th>Physics FPS</th>
-                    <th>Env FPS</th>
-                    <th>Overhead</th>
-                </tr>
-            </thead>
-            <tbody id="throughput-table-body"></tbody>
-        </table>
+        <details class="runs-details">
+            <summary>All Runs</summary>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Commit</th>
+                        <th>Task</th>
+                        <th>Physics FPS</th>
+                        <th>Env FPS</th>
+                        <th>Overhead</th>
+                    </tr>
+                </thead>
+                <tbody id="throughput-table-body"></tbody>
+            </table>
+        </details>
     </div>
 
     <script>
@@ -364,6 +436,7 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
 
         const runs = {runs_json};
         const METRICS = {metrics_json};
+        const GITHUB_REPO = '{github_repo}';
 
         // Sort by date ascending for charts.
         runs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -456,6 +529,14 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
                 options: {{
                     responsive: true,
                     maintainAspectRatio: false,
+                    onClick: (event, elements) => {{
+                        if (elements.length > 0) {{
+                            const d = data[elements[0].index];
+                            if (d?.commit && d.commit !== 'unknown') {{
+                                window.open(`${{GITHUB_REPO}}/commit/${{d.commit}}`, '_blank');
+                            }}
+                        }}
+                    }},
                     plugins: {{
                         legend: {{ display: false }},
                         tooltip: {{
@@ -467,6 +548,10 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
                                 label: (item) => {{
                                     const d = item.raw;
                                     return `${{label}}: ${{d.y?.toFixed(4)}} ${{unit}}`;
+                                }},
+                                footer: (items) => {{
+                                    const d = items[0]?.raw;
+                                    return d?.commit && d.commit !== 'unknown' ? 'Click to view commit' : '';
                                 }}
                             }}
                         }}
@@ -501,10 +586,13 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
         // Table
         const tbody = document.getElementById('table-body');
         [...runs].reverse().forEach(run => {{
+            const commitLink = run.commit && run.commit !== 'unknown'
+                ? `<a href="${{GITHUB_REPO}}/commit/${{run.commit}}" target="_blank"><code>${{run.commit}}</code></a>`
+                : `<code>${{run.commit}}</code>`;
             tbody.innerHTML += `
                 <tr>
                     <td>${{new Date(run.created_at).toLocaleDateString()}}</td>
-                    <td><code>${{run.commit}}</code></td>
+                    <td>${{commitLink}}</td>
                     <td><a href="${{run.url}}" target="_blank">${{run.name}}</a></td>
                     <td>${{(run.metrics.success_rate * 100).toFixed(1)}}%</td>
                     <td>${{run.metrics.mpkpe.toFixed(4)}}</td>
@@ -611,6 +699,16 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
                     options: {{
                         responsive: true,
                         maintainAspectRatio: false,
+                        onClick: (event, elements) => {{
+                            if (elements.length > 0) {{
+                                const datasetIndex = elements[0].datasetIndex;
+                                const index = elements[0].index;
+                                const d = datasets[datasetIndex].data[index];
+                                if (d?.commit && d.commit !== 'unknown') {{
+                                    window.open(`${{GITHUB_REPO}}/commit/${{d.commit}}`, '_blank');
+                                }}
+                            }}
+                        }},
                         plugins: {{
                             legend: {{ display: true, position: 'bottom' }},
                             tooltip: {{
@@ -618,6 +716,10 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
                                     title: (items) => {{
                                         const d = items[0]?.raw;
                                         return d ? `Commit: ${{d.commit}}` : '';
+                                    }},
+                                    footer: (items) => {{
+                                        const d = items[0]?.raw;
+                                        return d?.commit && d.commit !== 'unknown' ? 'Click to view commit' : '';
                                     }}
                                 }}
                             }}
@@ -646,10 +748,13 @@ def generate_dashboard_html(runs: list[dict], throughput_data: list[dict]) -> st
             [...throughputData].reverse().forEach(run => {{
                 run.results.forEach((r, i) => {{
                     const taskShort = r.task.replace('Mjlab-', '').replace('-Unitree-', '-');
+                    const commitLink = run.commit && run.commit !== 'unknown'
+                        ? `<a href="${{GITHUB_REPO}}/commit/${{run.commit}}" target="_blank"><code>${{run.commit}}</code></a>`
+                        : `<code>${{run.commit}}</code>`;
                     throughputTbody.innerHTML += `
                         <tr>
                             <td>${{i === 0 ? new Date(run.created_at).toLocaleDateString() : ''}}</td>
-                            <td>${{i === 0 ? `<code>${{run.commit}}</code>` : ''}}</td>
+                            <td>${{i === 0 ? commitLink : ''}}</td>
                             <td>${{taskShort}}</td>
                             <td>${{(r.physics_fps / 1000).toFixed(0)}}K</td>
                             <td>${{(r.env_fps / 1000).toFixed(0)}}K</td>

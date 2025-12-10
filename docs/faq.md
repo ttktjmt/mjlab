@@ -104,6 +104,15 @@ it easy to create a minimal reproducible example (MRE) and report it to the
 [MuJoCo Warp team](https://github.com/google-deepmind/mujoco_warp/issues).
 Reporting helps improve the framework for everyone!
 
+### Why aren't my training runs reproducible even with a fixed seed?
+
+MuJoCo Warp does not yet guarantee determinism, so running the same sim with
+identical inputs may produce slightly different outputs. This is a known
+limitation being tracked in
+[mujoco_warp#562](https://github.com/google-deepmind/mujoco_warp/issues/562).
+Until determinism is implemented upstream, mjlab training runs will not be
+perfectly reproducible even when setting a seed.
+
 ---
 
 ## Rendering & Visualization
