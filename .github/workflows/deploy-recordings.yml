@@ -1,0 +1,207 @@
+name: Deploy Recording to GitHub Pages
+
+on:
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'recordings/**'
+      - '.github/workflows/deploy-recording.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          version: "0.9.7"
+
+      - name: Install viser
+        run: |
+          uv tool install viser
+
+      - name: Build Viser client
+        run: |
+          viser-build-client --out-dir viser-client
+
+      - name: Generate recordings list
+        id: recordings
+        run: |
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          cd recordings
+          ls -1 *.viser 2>/dev/null | jq -R -s -c 'split("\n") | map(select(length > 0))' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Organize files for deployment
+        run: |
+          mkdir -p rec
+          mv viser-client rec/
+          mv recordings rec/
+
+      - name: Create index.html
+        run: |
+          RECORDINGS_JSON='${{ steps.recordings.outputs.files }}'
+          cat > rec/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>MJLab Recordings</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 20px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background: #f5f5f5;
+              }
+              .container {
+                max-width: 1200px;
+                margin: 0 auto;
+              }
+              h1 {
+                color: #333;
+                margin-bottom: 10px;
+              }
+              .description {
+                color: #666;
+                margin-bottom: 20px;
+              }
+              .controls {
+                margin-bottom: 20px;
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+              }
+              .controls label {
+                display: block;
+                margin-bottom: 8px;
+                font-weight: 600;
+                color: #333;
+              }
+              .controls select {
+                width: 100%;
+                padding: 10px;
+                font-size: 16px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background: white;
+                cursor: pointer;
+              }
+              .controls select:hover {
+                border-color: #0066cc;
+              }
+              .controls select:focus {
+                outline: none;
+                border-color: #0066cc;
+                box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+              }
+              .viewer-container {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                overflow: hidden;
+              }
+              iframe {
+                width: 100%;
+                height: 800px;
+                border: none;
+              }
+              .footer {
+                margin-top: 20px;
+                text-align: center;
+                color: #666;
+                font-size: 14px;
+              }
+              .footer a {
+                color: #0066cc;
+                text-decoration: none;
+              }
+              .footer a:hover {
+                text-decoration: underline;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>MJLab Recordings</h1>
+              <div class="controls">
+                <label for="recording-select">Select Recording:</label>
+                <select id="recording-select">
+                </select>
+              </div>
+              <div class="viewer-container">
+                <iframe id="viewer-iframe" src=""></iframe>
+              </div>
+            </div>
+            <script>
+              const recordings = RECORDINGS_PLACEHOLDER;
+              const select = document.getElementById('recording-select');
+              const iframe = document.getElementById('viewer-iframe');
+
+              // Populate select options
+              recordings.forEach((file, index) => {
+                const option = document.createElement('option');
+                option.value = file;
+                option.textContent = file.replace('.viser', '');
+                select.appendChild(option);
+              });
+
+              // Load recording function
+              function loadRecording(filename) {
+                if (filename) {
+                  iframe.src = `viser-client/?playbackPath=../recordings/${filename}`;
+                }
+              }
+
+              // Handle selection change
+              select.addEventListener('change', (e) => {
+                loadRecording(e.target.value);
+              });
+
+              // Load first recording by default
+              if (recordings.length > 0) {
+                select.value = recordings[0];
+                loadRecording(recordings[0]);
+              }
+            </script>
+          </body>
+          </html>
+          EOF
+
+          # Replace placeholder with actual recordings JSON
+          sed -i "s|RECORDINGS_PLACEHOLDER|${RECORDINGS_JSON}|g" rec/index.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
